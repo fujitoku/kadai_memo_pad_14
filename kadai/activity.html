@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>アクティビティ - Memo Pad</title>
+  <script src="js/jquery-2.1.3.min.js"></script>
+  <link rel="stylesheet" href="css/reset.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/memopad.css">
+</head>
+
+<body class="bg-gray-50">
+  <!-- ナビゲーション -->
+  <nav class="bg-white shadow-md">
+    <div class="container mx-auto px-4">
+      <div class="flex justify-between items-center py-4">
+        <h1 class="text-2xl font-bold text-gray-900">Memo Pad</h1>
+        <div class="flex space-x-4">
+          <a href="memo.html" class="nav-link">メモ作成</a>
+          <a href="calendar.html" class="nav-link">カレンダー</a>
+          <a href="activity.html" class="nav-link active">アクティビティ</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <main class="container mx-auto px-4 py-8">
+    <!-- ページヘッダー -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">アクティビティログ</h2>
+          <p class="text-gray-600 mt-1">メモの追加履歴を確認できます</p>
+        </div>
+        <div class="text-right">
+          <p class="text-sm text-gray-600">合計メモ数</p>
+          <p id="total-memos" class="text-3xl font-bold text-gray-900">0</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- フィルター -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex flex-wrap items-center gap-4">
+        <label class="flex items-center space-x-2">
+          <span class="text-gray-700 font-semibold">期間:</span>
+        </label>
+        <select id="filter-period" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500">
+          <option value="all">すべて</option>
+          <option value="today">今日</option>
+          <option value="week">今週</option>
+          <option value="month">今月</option>
+        </select>
+        <button id="clear-activities" class="ml-auto bg-gray-900 hover:bg-black text-white font-semibold py-2 px-4 rounded-lg transition duration-200">
+          全削除
+        </button>
+      </div>
+    </div>
+
+    <!-- アクティビティタイムライン -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h3 class="text-xl font-semibold mb-6 text-gray-800">メモ追加履歴</h3>
+      <div id="activity-timeline" class="space-y-4">
+        <!-- アクティビティがここに表示されます -->
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-gray-200 mt-12 py-6">
+    <div class="container mx-auto px-4 text-center text-gray-600">
+      <p>Memo Pad - Gs</p>
+    </div>
+  </footer>
+
+  <script>
+    $(document).ready(function() {
+      let currentFilter = 'all';
+
+      // アクティビティを表示
+      function displayActivities() {
+        const activities = JSON.parse(localStorage.getItem('activities') || '[]');
+        const memos = JSON.parse(localStorage.getItem('memos') || '{}');
+
+        // 合計メモ数を計算
+        let totalMemos = 0;
+        Object.values(memos).forEach(dateMemos => {
+          totalMemos += dateMemos.length;
+        });
+        $('#total-memos').text(totalMemos);
+
+        // フィルター処理
+        let filteredActivities = filterActivities(activities);
+
+        $('#activity-timeline').empty();
+
+        if (filteredActivities.length === 0) {
+          $('#activity-timeline').html('<p class="text-gray-500 text-center py-8">アクティビティがありません</p>');
+          return;
+        }
+
+        filteredActivities.forEach(function(activity, index) {
+          const date = new Date(activity.timestamp);
+          const dateStr = formatDate(date);
+          const timeStr = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+          // 前のアクティビティと日付が変わる場合、日付ヘッダーを表示
+          if (index === 0 || formatDateOnly(new Date(filteredActivities[index - 1].timestamp)) !== formatDateOnly(date)) {
+            const dateHeader = `
+              <div class="flex items-center my-4">
+                <div class="flex-grow border-t border-gray-300"></div>
+                <span class="px-4 text-sm text-gray-600 font-semibold">${formatDateOnly(date)}</span>
+                <div class="flex-grow border-t border-gray-300"></div>
+              </div>
+            `;
+            $('#activity-timeline').append(dateHeader);
+          }
+
+          const activityHtml = `
+            <div class="flex items-start space-x-4 p-4 border-l-4 border-gray-700 bg-gray-50 rounded-r-lg hover:bg-gray-100 transition duration-200">
+              <div class="flex-shrink-0">
+                <div class="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="flex-grow">
+                <div class="flex items-center justify-between mb-1">
+                  <h4 class="font-semibold text-gray-800">${activity.title}</h4>
+                  <span class="text-sm text-gray-500">${timeStr}</span>
+                </div>
+                <p class="text-sm text-gray-600">
+                  <span class="inline-block px-2 py-1 bg-gray-200 text-gray-800 rounded text-xs font-semibold mr-2">
+                    作成
+                  </span>
+                  ${activity.date}
+                </p>
+              </div>
+            </div>
+          `;
+          $('#activity-timeline').append(activityHtml);
+        });
+      }
+
+      // アクティビティをフィルター
+      function filterActivities(activities) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        switch (currentFilter) {
+          case 'today':
+            return activities.filter(a => new Date(a.timestamp) >= today);
+
+          case 'week':
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 7);
+            return activities.filter(a => new Date(a.timestamp) >= weekAgo);
+
+          case 'month':
+            const monthAgo = new Date(today);
+            monthAgo.setMonth(monthAgo.getMonth() - 1);
+            return activities.filter(a => new Date(a.timestamp) >= monthAgo);
+
+          default:
+            return activities;
+        }
+      }
+
+      // 日付フォーマット（完全版）
+      function formatDate(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayName = dayNames[date.getDay()];
+        const hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+
+        return `${year}年${month}月${day}日 (${dayName}) ${hours}:${minutes}`;
+      }
+
+      // 日付のみフォーマット
+      function formatDateOnly(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const dayName = dayNames[date.getDay()];
+
+        return `${year}年${month}月${day}日 (${dayName})`;
+      }
+
+      // フィルター変更イベント
+      $('#filter-period').on('change', function() {
+        currentFilter = $(this).val();
+        displayActivities();
+      });
+
+      // 全削除ボタン
+      $('#clear-activities').on('click', function() {
+        if (!confirm('すべてのメモとアクティビティを削除しますか？\nこの操作は取り消せません。')) {
+          return;
+        }
+
+        localStorage.removeItem('memos');
+        localStorage.removeItem('activities');
+        displayActivities();
+        alert('すべてのデータを削除しました');
+      });
+
+      // 初期化
+      displayActivities();
+    });
+  </script>
+</body>
+
+</html>

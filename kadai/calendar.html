@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カレンダー - Memo Pad</title>
+  <script src="js/jquery-2.1.3.min.js"></script>
+  <link rel="stylesheet" href="css/reset.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/memopad.css">
+</head>
+
+<body class="bg-gray-50">
+  <!-- ナビゲーション -->
+  <nav class="bg-white shadow-md">
+    <div class="container mx-auto px-4">
+      <div class="flex justify-between items-center py-4">
+        <h1 class="text-2xl font-bold text-gray-900">Memo Pad</h1>
+        <div class="flex space-x-4">
+          <a href="memo.html" class="nav-link">メモ作成</a>
+          <a href="calendar.html" class="nav-link active">カレンダー</a>
+          <a href="activity.html" class="nav-link">アクティビティ</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <main class="container mx-auto px-4 py-8">
+    <!-- カレンダーヘッダー -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="flex justify-between items-center">
+        <button id="prev-month" class="bg-gray-900 hover:bg-black text-white font-semibold py-2 px-4 rounded">
+          ← 前月
+        </button>
+        <h2 id="current-month" class="text-2xl font-bold text-gray-800"></h2>
+        <button id="next-month" class="bg-gray-900 hover:bg-black text-white font-semibold py-2 px-4 rounded">
+          次月 →
+        </button>
+      </div>
+    </div>
+
+    <!-- カレンダー -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="grid grid-cols-7 gap-2 mb-2">
+        <div class="text-center font-semibold text-gray-700 py-2">日</div>
+        <div class="text-center font-semibold text-gray-700 py-2">月</div>
+        <div class="text-center font-semibold text-gray-700 py-2">火</div>
+        <div class="text-center font-semibold text-gray-700 py-2">水</div>
+        <div class="text-center font-semibold text-gray-700 py-2">木</div>
+        <div class="text-center font-semibold text-gray-700 py-2">金</div>
+        <div class="text-center font-semibold text-gray-700 py-2">土</div>
+      </div>
+      <div id="calendar-grid" class="grid grid-cols-7 gap-2">
+        <!-- カレンダーの日付がここに生成されます -->
+      </div>
+    </div>
+
+    <!-- 選択した日付のメモ -->
+    <div id="selected-date-section" class="bg-white rounded-lg shadow-md p-6" style="display: none;">
+      <h3 id="selected-date-title" class="text-xl font-semibold mb-4 text-gray-800"></h3>
+      <div id="selected-date-memos" class="space-y-3">
+        <!-- 選択した日付のメモが表示されます -->
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-gray-200 mt-12 py-6">
+    <div class="container mx-auto px-4 text-center text-gray-600">
+      <p>Memo Pad - Gs</p>
+    </div>
+  </footer>
+
+  <script>
+    $(document).ready(function() {
+      let currentYear = new Date().getFullYear();
+      let currentMonth = new Date().getMonth();
+
+      // カレンダーを生成
+      function generateCalendar(year, month) {
+        $('#current-month').text(`${year}年${month + 1}月`);
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+
+        const memos = JSON.parse(localStorage.getItem('memos') || '{}');
+
+        $('#calendar-grid').empty();
+
+        // 空白セルを追加
+        for (let i = 0; i < firstDay; i++) {
+          $('#calendar-grid').append('<div class="calendar-day-empty"></div>');
+        }
+
+        // 日付セルを追加
+        for (let date = 1; date <= lastDate; date++) {
+          const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+          const hasMemo = memos[dateKey] && memos[dateKey].length > 0;
+          const memoCount = hasMemo ? memos[dateKey].length : 0;
+
+          const today = new Date();
+          const isToday = (year === today.getFullYear() && month === today.getMonth() && date === today.getDate());
+
+          let dayClass = 'calendar-day';
+          if (isToday) {
+            dayClass += ' today';
+          }
+          if (hasMemo) {
+            dayClass += ' has-memo';
+          }
+
+          const dayOfWeek = new Date(year, month, date).getDay();
+          let textColor = 'text-gray-800';
+          if (dayOfWeek === 0) textColor = 'text-gray-700'; // 日曜日
+          if (dayOfWeek === 6) textColor = 'text-gray-700'; // 土曜日
+
+          const dayHtml = `
+            <div class="${dayClass}" data-date="${dateKey}">
+              <div class="font-semibold ${textColor}">${date}</div>
+              ${hasMemo ? `<div class="memo-badge">${memoCount}件</div>` : ''}
+            </div>
+          `;
+          $('#calendar-grid').append(dayHtml);
+        }
+
+        // 日付クリックイベント
+        $('.calendar-day').on('click', function() {
+          const dateKey = $(this).data('date');
+          showMemosForDate(dateKey);
+        });
+      }
+
+      // 選択した日付のメモを表示
+      function showMemosForDate(dateKey) {
+        const memos = JSON.parse(localStorage.getItem('memos') || '{}');
+        const dateMemos = memos[dateKey] || [];
+
+        const dateObj = new Date(dateKey);
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth() + 1;
+        const date = dateObj.getDate();
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const day = dayNames[dateObj.getDay()];
+
+        $('#selected-date-title').text(`${year}年${month}月${date}日 (${day}) のメモ`);
+        $('#selected-date-memos').empty();
+
+        if (dateMemos.length === 0) {
+          $('#selected-date-memos').html('<p class="text-gray-500 text-center py-4">この日のメモはありません</p>');
+        } else {
+          dateMemos.forEach(function(memo) {
+            const time = new Date(memo.timestamp);
+            const timeStr = `${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')}`;
+
+            const memoHtml = `
+              <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition duration-200">
+                <div class="flex justify-between items-start mb-2">
+                  <h4 class="font-semibold text-gray-800">${memo.title}</h4>
+                  <span class="text-sm text-gray-500">${timeStr}</span>
+                </div>
+                <p class="text-gray-700 whitespace-pre-wrap">${memo.content}</p>
+                <button class="delete-memo mt-3 text-gray-700 hover:text-gray-900 text-sm font-medium" data-date="${dateKey}" data-id="${memo.id}">
+                  削除
+                </button>
+              </div>
+            `;
+            $('#selected-date-memos').append(memoHtml);
+          });
+
+          // 削除ボタンのイベント
+          $('.delete-memo').on('click', function() {
+            const dateKey = $(this).data('date');
+            const memoId = $(this).data('id');
+            deleteMemo(dateKey, memoId);
+          });
+        }
+
+        $('#selected-date-section').show();
+
+        // 選択した日付までスクロール
+        $('html, body').animate({
+          scrollTop: $('#selected-date-section').offset().top - 20
+        }, 500);
+      }
+
+      // メモを削除
+      function deleteMemo(dateKey, memoId) {
+        if (!confirm('このメモを削除しますか?')) {
+          return;
+        }
+
+        let memos = JSON.parse(localStorage.getItem('memos') || '{}');
+
+        if (memos[dateKey]) {
+          memos[dateKey] = memos[dateKey].filter(memo => memo.id !== memoId);
+
+          if (memos[dateKey].length === 0) {
+            delete memos[dateKey];
+          }
+
+          localStorage.setItem('memos', JSON.stringify(memos));
+
+          // カレンダーを再生成
+          generateCalendar(currentYear, currentMonth);
+
+          // メモ表示を更新
+          showMemosForDate(dateKey);
+        }
+      }
+
+      // 前月ボタン
+      $('#prev-month').on('click', function() {
+        currentMonth--;
+        if (currentMonth < 0) {
+          currentMonth = 11;
+          currentYear--;
+        }
+        generateCalendar(currentYear, currentMonth);
+        $('#selected-date-section').hide();
+      });
+
+      // 次月ボタン
+      $('#next-month').on('click', function() {
+        currentMonth++;
+        if (currentMonth > 11) {
+          currentMonth = 0;
+          currentYear++;
+        }
+        generateCalendar(currentYear, currentMonth);
+        $('#selected-date-section').hide();
+      });
+
+      // 初期化
+      generateCalendar(currentYear, currentMonth);
+    });
+  </script>
+</body>
+
+</html>

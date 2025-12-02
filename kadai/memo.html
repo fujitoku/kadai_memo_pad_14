@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メモ作成 - Memo Pad</title>
+  <script src="js/jquery-2.1.3.min.js"></script>
+  <link rel="stylesheet" href="css/reset.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/memopad.css">
+</head>
+
+<body class="bg-gray-50">
+  <!-- ナビゲーション -->
+  <nav class="bg-white shadow-md">
+    <div class="container mx-auto px-4">
+      <div class="flex justify-between items-center py-4">
+        <h1 class="text-2xl font-bold text-gray-900">メモ帳</h1>
+        <div class="flex space-x-4">
+          <a href="memo.html" class="nav-link active">メモ作成</a>
+          <a href="calendar.html" class="nav-link">カレンダー</a>
+          <a href="activity.html" class="nav-link">アクティビティ</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- メインコンテンツ -->
+  <main class="container mx-auto px-4 py-8">
+    <!-- 今日の日付表示 -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div class="text-center">
+        <p class="text-gray-600 text-sm mb-2">今日の日付</p>
+        <h2 id="today-date" class="text-3xl font-bold text-gray-800"></h2>
+      </div>
+    </div>
+
+    <!-- メモ入力エリア -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+      <h3 class="text-xl font-semibold mb-4 text-gray-800">メモを作成</h3>
+
+      <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-semibold mb-2" for="memo-title">
+          タイトル
+        </label>
+        <input
+          id="memo-title"
+          type="text"
+          placeholder="タイトルを入力してください"
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500"
+        >
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-semibold mb-2" for="memo-content">
+          メモ内容
+        </label>
+        <textarea
+          id="memo-content"
+          rows="6"
+          placeholder="メモ内容を入力してください"
+          class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 resize-none"
+        ></textarea>
+      </div>
+
+      <div class="flex space-x-4">
+        <button
+          id="save-memo"
+          class="flex-1 bg-gray-900 hover:bg-black text-white font-semibold py-3 px-6 rounded-lg transition duration-200"
+        >
+          保存
+        </button>
+        <button
+          id="clear-form"
+          class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 px-6 rounded-lg transition duration-200"
+        >
+          クリア
+        </button>
+      </div>
+    </div>
+
+    <!-- 今日のメモ一覧 -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h3 class="text-xl font-semibold mb-4 text-gray-800">今日のメモ</h3>
+      <div id="today-memos" class="space-y-3">
+        <!-- ここに今日のメモが表示されます -->
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-gray-200 mt-12 py-6">
+    <div class="container mx-auto px-4 text-center text-gray-600">
+      <p>Memo Pad - Gs</p>
+    </div>
+  </footer>
+
+  <script>
+    $(document).ready(function() {
+      // 今日の日付を表示
+      function displayTodayDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = today.getMonth() + 1;
+        const date = today.getDate();
+        const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+        const day = dayNames[today.getDay()];
+
+        $('#today-date').text(`${year}年${month}月${date}日 (${day})`);
+      }
+
+      // 今日の日付をYYYY-MM-DD形式で取得
+      function getTodayKey() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const date = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${date}`;
+      }
+
+      // メモを保存
+      $('#save-memo').on('click', function() {
+        const title = $('#memo-title').val().trim();
+        const content = $('#memo-content').val().trim();
+
+        if (!title || !content) {
+          alert('タイトルと内容を入力してください');
+          return;
+        }
+
+        const todayKey = getTodayKey();
+        const timestamp = new Date().getTime();
+
+        // 既存のメモを取得
+        let memos = JSON.parse(localStorage.getItem('memos') || '{}');
+
+        if (!memos[todayKey]) {
+          memos[todayKey] = [];
+        }
+
+        // 新しいメモを追加
+        const newMemo = {
+          id: timestamp,
+          title: title,
+          content: content,
+          timestamp: timestamp
+        };
+
+        memos[todayKey].push(newMemo);
+
+        // localStorageに保存
+        localStorage.setItem('memos', JSON.stringify(memos));
+
+        // アクティビティログに追加
+        let activities = JSON.parse(localStorage.getItem('activities') || '[]');
+        activities.unshift({
+          id: timestamp,
+          date: todayKey,
+          title: title,
+          action: 'created',
+          timestamp: timestamp
+        });
+        localStorage.setItem('activities', JSON.stringify(activities));
+
+        // 表示を更新
+        displayTodayMemos();
+
+        // フォームをクリア
+        $('#memo-title').val('');
+        $('#memo-content').val('');
+
+        alert('メモを保存しました！');
+      });
+
+      // フォームをクリア
+      $('#clear-form').on('click', function() {
+        $('#memo-title').val('');
+        $('#memo-content').val('');
+      });
+
+      // 今日のメモを表示
+      function displayTodayMemos() {
+        const todayKey = getTodayKey();
+        const memos = JSON.parse(localStorage.getItem('memos') || '{}');
+        const todayMemos = memos[todayKey] || [];
+
+        $('#today-memos').empty();
+
+        if (todayMemos.length === 0) {
+          $('#today-memos').html('<p class="text-gray-500 text-center py-4">まだメモがありません</p>');
+          return;
+        }
+
+        todayMemos.forEach(function(memo) {
+          const time = new Date(memo.timestamp);
+          const timeStr = `${time.getHours()}:${String(time.getMinutes()).padStart(2, '0')}`;
+
+          const memoHtml = `
+            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition duration-200">
+              <div class="flex justify-between items-start mb-2">
+                <h4 class="font-semibold text-gray-800">${memo.title}</h4>
+                <span class="text-sm text-gray-500">${timeStr}</span>
+              </div>
+              <p class="text-gray-700 whitespace-pre-wrap">${memo.content}</p>
+              <button class="delete-memo mt-3 text-gray-700 hover:text-gray-900 text-sm font-medium" data-id="${memo.id}">
+                削除
+              </button>
+            </div>
+          `;
+          $('#today-memos').append(memoHtml);
+        });
+
+        // 削除ボタンのイベント
+        $('.delete-memo').on('click', function() {
+          const memoId = $(this).data('id');
+          deleteMemo(todayKey, memoId);
+        });
+      }
+
+      // メモを削除
+      function deleteMemo(dateKey, memoId) {
+        if (!confirm('このメモを削除しますか?')) {
+          return;
+        }
+
+        let memos = JSON.parse(localStorage.getItem('memos') || '{}');
+
+        if (memos[dateKey]) {
+          memos[dateKey] = memos[dateKey].filter(memo => memo.id !== memoId);
+
+          if (memos[dateKey].length === 0) {
+            delete memos[dateKey];
+          }
+
+          localStorage.setItem('memos', JSON.stringify(memos));
+          displayTodayMemos();
+        }
+      }
+
+      // 初期化
+      displayTodayDate();
+      displayTodayMemos();
+    });
+  </script>
+</body>
+
+</html>
